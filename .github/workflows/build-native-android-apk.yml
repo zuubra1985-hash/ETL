@@ -54,6 +54,9 @@ jobs:
           test -f /tmp/arm-etl-android/app/build.gradle
           test -f /tmp/arm-etl-android/app/src/main/AndroidManifest.xml
 
+      - name: Apply verified Java compile fixes
+        run: python android-native/patch_android_source.py
+
       - name: Build debug APK
         run: gradle --no-daemon -p /tmp/arm-etl-android clean assembleDebug
 
