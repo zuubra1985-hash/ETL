@@ -1,0 +1,65 @@
+name: Build Native ARM ETL Android APK
+
+on:
+  push:
+    branches:
+      - build/native-android-apk
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Compile Android application
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 34
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Restore and validate Android source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat android-native/source-parts/part*.b64 | base64 --decode > /tmp/arm-etl-android.tar.xz
+          xz --test /tmp/arm-etl-android.tar.xz
+          mkdir -p /tmp/arm-etl-android
+          tar -tJf /tmp/arm-etl-android.tar.xz
+          tar -xJf /tmp/arm-etl-android.tar.xz -C /tmp/arm-etl-android
+          test -f /tmp/arm-etl-android/settings.gradle
+          test -f /tmp/arm-etl-android/app/build.gradle
+          test -f /tmp/arm-etl-android/app/src/main/AndroidManifest.xml
+
+      - name: Build debug APK
+        run: gradle --no-daemon -p /tmp/arm-etl-android clean assembleDebug
+
+      - name: Verify APK output
+        run: |
+          test -s /tmp/arm-etl-android/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh /tmp/arm-etl-android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARM_ETL_Android_APK
+          path: /tmp/arm-etl-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 90
